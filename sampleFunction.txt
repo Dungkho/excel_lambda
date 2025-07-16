@@ -1,0 +1,83 @@
+_pivot = LAMBDA(range,
+    LET(
+        set, range,
+        IDs, INDEX(set, , 1),
+        dates, INDEX(set, , 2),
+        HREDUCE, LAMBDA(id, arr, REDUCE(id, arr, LAMBDA(a, v, HSTACK(a, v)))),
+        output, DROP(
+            REDUCE(
+                "",
+                UNIQUE(IDs),
+                LAMBDA(a, v,
+                    VSTACK(
+                        a,
+                        LET(
+                            idDates, FILTER(dates, ISNUMBER(XMATCH(IDs, v))),
+                            HREDUCE(v, idDates)
+                        )
+                    )
+                )
+            ),
+            1
+        ),
+        IFERROR(VSTACK(HSTACK("ID", "Dates"), output), "")
+    )
+);
+//---------------
+_Files=LAMBDA(path, TRANSPOSE(FILES(path)));
+//---------------
+_getCell=LAMBDA(num,ref, GET.CELL(num, ref));
+
+_getDocument= LAMBDA(num,GET.DOCUMENT(num));
+
+_getWorkspace= LAMBDA(num,GET.WORKSPACE(num));
+
+_getSheetName =LAMBDA( BYROW(TRANSPOSE(GET.WORKBOOK(1)), LAMBDA(x, TEXTAFTER(x, "]"))));
+
+_blr = LAMBDA(range,col,char,lr,LET(_n, IF(char = 0, 99999, ABS(char)), dt, SORT(range, col, 1), rw, SEQUENCE(ROWS(dt)), _lr, lr, _cl, BYROW(CHOOSECOLS(dt, col), LAMBDA(x, IF(_lr <= 0, LEFT(x, _n), RIGHT(x, _n)))), DROP(IFNA(SORT(VSTACK(FILTER(rw, _cl <> VSTACK("@|@", DROP(_cl, -1, ))) - 0, 1, HSTACK(rw, dt))), ""), 2, 1)));
+
+_fillDown =LAMBDA(range, TRANSPOSE( SCAN(0,TRANSPOSE( range ),LAMBDA(i,v,IF( v = "", i,v )) )));
+
+_reversCols =LAMBDA(array, LET( _arr,array, CHOOSECOLS(_arr, SORT(SEQUENCE(COLUMNS(_arr)),1,-1) )) );
+
+_reversRows =LAMBDA(array, LET( _arr,array, CHOOSEROWS(_arr, SORT(SEQUENCE(ROWS(_arr)),1,-1) )) );
+
+_crossJoin =
+LAMBDA(array1,array2,has_header_row,
+  LET(
+    HasHeader, IF(ISBLANK(has_header_row), FALSE, has_header_row),
+    BothRowArrays, AND(ROWS(array1) = 1, ROWS(array2) = 1),
+
+    Data1, IF(BothRowArrays, TRANSPOSE(array1), IF(HasHeader, DROP(array1, 1), array1)),
+    Data2, IF(BothRowArrays, TRANSPOSE(array2), IF(HasHeader, DROP(array2, 1), array2)),
+
+    D1Cols, COLUMNS(Data1),
+    D2Rows, ROWS(Data2),
+
+    Reducer,
+      MAKEARRAY(
+        ROWS(Data1) * D2Rows,
+        D1Cols + COLUMNS(Data2),
+        LAMBDA(i, j,
+          IF(
+            j <= D1Cols,
+            INDEX(Data1, ROUNDUP(i / D2Rows, 0), j),
+            INDEX(Data2, MOD(i - 1, D2Rows) + 1, j - D1Cols)
+          )
+        )
+      ),
+
+    IF(
+      BothRowArrays,
+      TRANSPOSE(Reducer),
+      IF(
+        HasHeader,
+        VSTACK(
+          HSTACK(TAKE(array1, 1), TAKE(array2, 1)),
+          Reducer
+        ),
+        Reducer
+      )
+    )
+  )
+);
