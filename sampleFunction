@@ -1,0 +1,3 @@
+formula_a = LAMBDA(x, x + 1);
+
+formula_b = 10;
